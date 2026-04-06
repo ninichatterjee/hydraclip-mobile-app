@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { ActivityIndicator, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ReadingIntervalProvider } from './contexts/ReadingIntervalContext'
 import LoginScreen from './screens/LoginScreen'
 import SignUpScreen from './screens/SignUpScreen'
 import HomeScreen from './screens/HomeScreen'
@@ -31,9 +32,9 @@ function MainNavigator() {
           tabBarStyle: {
             backgroundColor: colors.card,
             borderTopColor: colors.border,
-            paddingBottom: 6,
-            paddingTop: 6,
-            height: 60,
+            paddingBottom: 30,
+            paddingTop: 8,
+            height: 80,
           },
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
@@ -82,7 +83,9 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <ReadingIntervalProvider>
+        <RootNavigator />
+      </ReadingIntervalProvider>
     </AuthProvider>
   )
 }

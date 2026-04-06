@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useReadingInterval } from '../contexts/ReadingIntervalContext'
 import { colors, spacing, radius, shadow } from '../theme'
 
 export default function SettingsScreen() {
@@ -21,6 +22,9 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [hospitalName, setHospitalName] = useState<string | null>(null)
+  const { intervalMinutes, setIntervalMinutes } = useReadingInterval()
+  const [readingInterval, setReadingInterval] = useState(String(intervalMinutes))
+  const [reminderMode, setReminderMode] = useState<'vibration' | 'sound'>('vibration')
 
   const fetchProfile = useCallback(async () => {
     if (!user) { setLoading(false); return }
@@ -109,6 +113,66 @@ export default function SettingsScreen() {
                   <Text style={styles.saveButtonText}>Save Goal</Text>
                 )}
               </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reading Interval</Text>
+            <View style={styles.card}>
+              <Text style={styles.label}>How often to take a reading</Text>
+              <Text style={styles.hint}>Interval in minutes between readings</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  value={readingInterval}
+                  onChangeText={(text) => {
+                    setReadingInterval(text)
+                    const parsed = parseFloat(text)
+                    if (!isNaN(parsed) && parsed > 0) {
+                      setIntervalMinutes(parsed)
+                    }
+                  }}
+                  keyboardType="decimal-pad"
+                  maxLength={4}
+                  placeholder="20"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Text style={styles.pctSuffix}>min</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reminder Mode</Text>
+            <View style={styles.card}>
+              <Text style={styles.label}>How would you like to be reminded?</Text>
+              <Text style={styles.hint}>Connected to HydraClip hardware</Text>
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleOption,
+                    reminderMode === 'vibration' && styles.toggleOptionActive,
+                  ]}
+                  onPress={() => setReminderMode('vibration')}
+                >
+                  <Text style={[
+                    styles.toggleOptionText,
+                    reminderMode === 'vibration' && styles.toggleOptionTextActive,
+                  ]}>Low Vibration</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleOption,
+                    reminderMode === 'sound' && styles.toggleOptionActive,
+                  ]}
+                  onPress={() => setReminderMode('sound')}
+                >
+                  <Text style={[
+                    styles.toggleOptionText,
+                    reminderMode === 'sound' && styles.toggleOptionTextActive,
+                  ]}>Low Sound</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -320,5 +384,31 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  toggleOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  toggleOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  toggleOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  toggleOptionTextActive: {
+    color: colors.primary,
   },
 })

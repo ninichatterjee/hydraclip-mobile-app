@@ -1,15 +1,15 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useReadingInterval } from '../contexts/ReadingIntervalContext'
 import { DataPoint, HydrationLog } from '../types'
 import { getStatus, getStatusMessage, getStatusColor, generateForecast } from '../utils/hydration'
 import { colors, spacing, radius, shadow } from '../theme'
@@ -17,9 +17,10 @@ import { colors, spacing, radius, shadow } from '../theme'
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const { user } = useAuth()
+  const { intervalMinutes } = useReadingInterval()
   const [data, setData] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [inserting, setInserting] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const currentScore = data.length > 0 ? data[data.length - 1].value : 0.75
   const status = getStatus(currentScore)
@@ -48,10 +49,10 @@ export default function HomeScreen() {
 
       if (logs && logs.length > 0) {
         const formattedData: DataPoint[] = (logs as HydrationLog[]).map((log) => ({
-          time: new Date(log.created_at).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+          time: new Date(log.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           value: log.hydration_level,
         }))
-        setData(formattedData)
+        setData(formattedData.slice(-7))
       }
     } catch (err) {
       console.error('Unexpected error:', err)
@@ -62,25 +63,32 @@ export default function HomeScreen() {
 
   useEffect(() => { fetchHydrationData() }, [fetchHydrationData])
 
-  const insertRandomHydration = useCallback(async () => {
-    setInserting(true)
-    try {
-      const randomValue = Math.random() * 0.9 + 0.1
-      const insertData: any = { hydration_level: randomValue, nurse_id: 'n1' }
-      if (user) insertData.user_id = user.id
+  // Auto-insert a simulated reading every intervalMinutes
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
 
-      const { error } = await supabase.from('hydration_logs').insert(insertData)
-      if (error) {
-        console.error('Error inserting hydration data:', JSON.stringify(error, null, 2))
-        return
+    const ms = intervalMinutes * 60 * 1000
+    timerRef.current = setInterval(async () => {
+      try {
+        const randomValue = Math.random() * 0.9 + 0.1
+        const insertData: any = { hydration_level: randomValue, nurse_id: 'n1' }
+        if (user) insertData.user_id = user.id
+
+        const { error } = await supabase.from('hydration_logs').insert(insertData)
+        if (error) {
+          console.error('Auto-reading insert error:', JSON.stringify(error, null, 2))
+          return
+        }
+        await fetchHydrationData()
+      } catch (err) {
+        console.error('Auto-reading error:', err)
       }
-      await fetchHydrationData()
-    } catch (err) {
-      console.error('Unexpected error:', err)
-    } finally {
-      setInserting(false)
+    }, ms)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [fetchHydrationData, user])
+  }, [intervalMinutes, user, fetchHydrationData])
 
   const chartData = [...data, ...generateForecast(data)]
   const totalPoints = chartData.length
@@ -166,21 +174,6 @@ export default function HomeScreen() {
           </Text>
         </View>
       )}
-
-      <TouchableOpacity
-        style={[styles.button, inserting && styles.buttonDisabled]}
-        onPress={insertRandomHydration}
-        disabled={inserting || loading}
-      >
-        {inserting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Text style={styles.buttonIcon}>💧</Text>
-            <Text style={styles.buttonText}>Add Hydration Reading</Text>
-          </>
-        )}
-      </TouchableOpacity>
     </ScrollView>
   )
 }
@@ -239,12 +232,4 @@ const styles = StyleSheet.create({
   noDataText: { color: colors.textSecondary, fontSize: 14 },
   alertCard: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.md },
   alertText: { fontSize: 14, lineHeight: 20 },
-  button: {
-    backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.md,
-    ...shadow.medium,
-  },
-  buttonDisabled: { opacity: 0.7 },
-  buttonIcon: { fontSize: 20, marginRight: spacing.sm },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 })
